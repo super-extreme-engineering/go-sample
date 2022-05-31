@@ -1,0 +1,66 @@
+name: build
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+    types: [opened, synchronize, reopened]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      GO111MODULE: 'on'
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0  # Shallow clones should be disabled for a better relevancy of analysis
+      - name: Setup Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: '1.17'
+      - name: Install golangci-lint
+        run: |
+          curl -sSLO https://github.com/golangci/golangci-lint/releases/download/v$GOLANGCI_LINT_VERSION/golangci-lint-$GOLANGCI_LINT_VERSION-linux-amd64.tar.gz
+          shasum -a 256 golangci-lint-$GOLANGCI_LINT_VERSION-linux-amd64.tar.gz | grep "^$GOLANGCI_LINT_SHA256  " > /dev/null
+          tar -xf golangci-lint-$GOLANGCI_LINT_VERSION-linux-amd64.tar.gz
+          sudo mv golangci-lint-$GOLANGCI_LINT_VERSION-linux-amd64/golangci-lint /usr/local/bin/golangci-lint
+          rm -rf golangci-lint-$GOLANGCI_LINT_VERSION-linux-amd64*
+        env:
+          GOLANGCI_LINT_VERSION: '1.43.0'
+          GOLANGCI_LINT_SHA256: 'f3515cebec926257da703ba0a2b169e4a322c11dc31a8b4656b50a43e48877f4'
+      - name: Generate style report
+        #run: golangci-lint run --out-format checkstyle > golangci-report.xml
+        run: |
+          golangci-lint  run --out-format checkstyle -D deadcode,unused --build-tags=integration --timeout 10m --issues-exit-code 0 ./... > golangci-report.xml
+        continue-on-error: true
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: golangci-report
+          path: ${{ github.workspace }}/golangci-report.xml
+     - name: Run unit tests
+       run: make test-coverage
+      continue-on-error: true
+      - name: Analyze with SonarCloud
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - name: Generate SonarCloud report
+        run: |
+          java -Dconfig.file=tools/reportconfig.properties -Dreport.type=2 -Dsonar.token=$SONAR_TOKEN -Dsonar.branch=$GITHUB_REF_NAME -jar tools/report.jar
+          sudo mv *.pdf report.pdf
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: report
+          path: ${{ github.workspace }}/report.pdf
