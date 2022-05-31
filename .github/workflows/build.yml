@@ -2,16 +2,15 @@ name: build
 on:
   push:
     branches:
-      - main
+      - master
       - develop
   pull_request:
     branches:
-      - main
+      - master
       - develop
     types: [opened, synchronize, reopened]
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
     env:
       GO111MODULE: 'on'
@@ -47,7 +46,7 @@ jobs:
           path: ${{ github.workspace }}/golangci-report.xml
      - name: Run unit tests
        run: make test-coverage
-      continue-on-error: true
+       continue-on-error: true
       - name: Analyze with SonarCloud
         uses: sonarsource/sonarcloud-github-action@master
         env:
