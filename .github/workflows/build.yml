@@ -44,9 +44,9 @@ jobs:
         with:
           name: golangci-report
           path: ${{ github.workspace }}/golangci-report.xml
-     - name: Run unit tests
-       run: make test-coverage
-       continue-on-error: true
+      - name: Run unit tests
+        run: make test-coverage
+        continue-on-error: true
       - name: Analyze with SonarCloud
         uses: sonarsource/sonarcloud-github-action@master
         env:
